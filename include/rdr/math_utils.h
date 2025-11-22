@@ -332,6 +332,7 @@ RDR_FORCEINLINE Vec3f CosineSampleHemisphere(const Vec2f &u) {
 
 RDR_FORCEINLINE Vec3f UniformSampleSphere(const Vec2f &u) {
   // This is left as the next assignment
+  return Vec3f (0,0,0);
   UNIMPLEMENTED;
 }
 

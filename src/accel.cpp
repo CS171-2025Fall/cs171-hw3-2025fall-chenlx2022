@@ -43,7 +43,33 @@ bool AABB::intersect(const Ray &ray, Float *t_in, Float *t_out) const {
   //    for getting the inverse direction of the ray.
   // @see Min/Max/ReduceMin/ReduceMax
   //    for vector min/max operations.
-  UNIMPLEMENTED;
+
+  //HW3 IMPLEMENTED
+  
+
+  Vec3f inv_dir = ray.safe_inverse_direction;
+  
+
+  Vec3f t0 = (low_bnd - ray.origin) * inv_dir;
+  Vec3f t1 = (upper_bnd - ray.origin) * inv_dir;
+  
+
+  Vec3f t_near = Min(t0, t1);
+  Vec3f t_far = Max(t0, t1);
+
+  Float t_enter = ReduceMax(t_near);
+  Float t_exit = ReduceMin(t_far);
+  
+
+  if (t_enter > t_exit || t_exit < 0) {
+    return false;
+  }
+  
+
+  *t_in = t_enter;
+  *t_out = t_exit;
+  
+  return true;
 }
 
 /* ===================================================================== *
@@ -91,11 +117,85 @@ bool TriangleIntersect(Ray &ray, const uint32_t &triangle_index,
   // Useful Functions:
   // You can use @see Cross and @see Dot for determinant calculations.
 
-  // Delete the following lines after you implement the function
-  InternalScalarType u = InternalScalarType(0);
-  InternalScalarType v = InternalScalarType(0);
-  InternalScalarType t = InternalScalarType(0);
-  UNIMPLEMENTED;
+  //HW3 IMPLEMENTED
+  
+  InternalVecType origin = Cast<InternalScalarType>(ray.origin);
+  
+
+  InternalVecType edge1 = v1 - v0;
+  InternalVecType edge2 = v2 - v0;
+  InternalVecType normal_unnormalized = Cross(edge1, edge2);
+  InternalScalarType normal_length = Norm(normal_unnormalized);
+  
+
+  
+  InternalVecType normal = normal_unnormalized / normal_length;
+  
+
+  InternalScalarType d = Dot(normal, v0);
+  
+
+  InternalScalarType n_dot_dir = Dot(normal, dir);
+  if (abs(n_dot_dir) < InternalScalarType(1e-8)) {
+    return false;
+  }
+  
+
+  InternalScalarType t = (d - Dot(normal, origin)) / n_dot_dir;
+  
+
+  if (t < InternalScalarType(ray.t_min) || t > InternalScalarType(ray.t_max)) {
+    return false;
+  }
+  
+
+  InternalVecType Q = origin + t * dir;
+  
+
+  InternalVecType edge_v0v1 = v1 - v0;
+  InternalVecType vp0 = Q - v0;
+  InternalScalarType test1 = Dot(Cross(edge_v0v1, vp0), normal);
+  if (test1 < InternalScalarType(0.0)) {
+    return false;
+  }
+  
+
+  InternalVecType edge_v1v2 = v2 - v1;
+  InternalVecType vp1 = Q - v1;
+  InternalScalarType test2 = Dot(Cross(edge_v1v2, vp1), normal);
+  if (test2 < InternalScalarType(0.0)) {
+    return false;
+  }
+  
+
+  InternalVecType edge_v2v0 = v0 - v2;
+  InternalVecType vp2 = Q - v2;
+  InternalScalarType test3 = Dot(Cross(edge_v2v0, vp2), normal);
+  if (test3 < InternalScalarType(0.0)) {
+    return false;
+  }
+  
+
+  InternalScalarType area_abc = Dot(normal_unnormalized, normal);
+  
+
+  InternalVecType edge_qv1 = v2 - v1;
+  InternalVecType qv1 = Q - v1;
+  InternalScalarType area_qbc = Dot(Cross(edge_qv1, qv1), normal);
+  InternalScalarType alpha = area_qbc / area_abc;
+  
+
+  InternalVecType edge_qv2 = v0 - v2;
+  InternalVecType qv2 = Q - v2;
+  InternalScalarType area_aqc = Dot(Cross(edge_qv2, qv2), normal);
+  InternalScalarType beta = area_aqc / area_abc;
+  
+
+  InternalScalarType gamma = InternalScalarType(1.0) - alpha - beta;
+  
+
+  InternalScalarType u = beta;
+  InternalScalarType v = gamma;
 
   // We will reach here if there is an intersection
 

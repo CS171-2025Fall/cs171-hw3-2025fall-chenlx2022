@@ -104,7 +104,18 @@ Vec3f PerfectRefraction::sample(
   // @see Refract for refraction calculation.
   // @see Reflect for reflection calculation.
 
-  UNIMPLEMENTED;
+  //HW3 IMPLEMENTED
+
+  Vec3f refracted;
+  bool refracted_success = Refract(interaction.wo, normal, eta_corrected, refracted);
+  
+  if (refracted_success) {
+
+    interaction.wi = refracted;
+  } else {
+
+    interaction.wi = Reflect(interaction.wo, normal);
+  }
 
   // Set the pdf and return value, we dont need to understand the value now
   if (pdf != nullptr) *pdf = 1.0F;

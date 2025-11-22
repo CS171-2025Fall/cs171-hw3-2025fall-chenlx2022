@@ -50,19 +50,21 @@ void IntersectionTestIntegrator::render(ref<Camera> camera, ref<Scene> scene) {
         // @see Camera::generateDifferentialRay for generating rays given
         // pixel sample positions as 2 floats.
 
-        // You should assign the following two variables
-        // const Vec2f &pixel_sample = ...
-        // auto ray = ...
+        //HW3 IMPLEMENTED
 
-        // After you assign pixel_sample and ray, you can uncomment the
-        // following lines to accumulate the radiance to the film.
-        //
-        //
-        // Accumulate radiance
-        // assert(pixel_sample.x >= dx && pixel_sample.x <= dx + 1);
-        // assert(pixel_sample.y >= dy && pixel_sample.y <= dy + 1);
-        // const Vec3f &L = Li(scene, ray, sampler);
-        // camera->getFilm()->commitSample(pixel_sample, L);
+        
+        const Vec2f &pixel_sample = sampler.getPixelSample();
+        
+
+        auto ray = camera->generateDifferentialRay(pixel_sample.x, pixel_sample.y);
+
+
+        const Vec3f &L = Li(scene, ray, sampler);
+        
+
+        assert(pixel_sample.x >= dx && pixel_sample.x <= dx + 1);
+        assert(pixel_sample.y >= dy && pixel_sample.y <= dy + 1);
+        camera->getFilm()->commitSample(pixel_sample, L);
       }
     }
   }
@@ -103,8 +105,13 @@ Vec3f IntersectionTestIntegrator::Li(
       // @see BSDF::sample
       // @see SurfaceInteraction::spawnRay
       //
-      // You should update ray = ... with the spawned ray
-      UNIMPLEMENTED;
+      
+      //HW3 IMPLEMENTED
+
+      interaction.bsdf->sample(interaction, sampler, nullptr);
+      
+
+      ray = interaction.spawnRay(interaction.wi);
       continue;
     }
 
@@ -129,6 +136,16 @@ Vec3f IntersectionTestIntegrator::Li(
 Vec3f IntersectionTestIntegrator::directLighting(
     ref<Scene> scene, SurfaceInteraction &interaction) const {
   Vec3f color(0, 0, 0);
+  
+
+  //HW3 IMPLEMENTED
+
+  if (use_area_light) {
+
+    return directLightingAreaLight(scene, interaction);
+  }
+  
+
   Float dist_to_light = Norm(point_light_position - interaction.p);
   Vec3f light_dir     = Normalize(point_light_position - interaction.p);
   auto test_ray       = DifferentialRay(interaction.p, light_dir);
@@ -148,7 +165,17 @@ Vec3f IntersectionTestIntegrator::directLighting(
   //
   //    You can use iteraction.p to get the intersection position.
   //
-  UNIMPLEMENTED;
+  //HW3 IMPLEMENTED
+
+  SurfaceInteraction shadow_interaction;
+  
+
+  test_ray.setTimeMax(dist_to_light - EPS);
+  
+  if (scene->intersect(test_ray, shadow_interaction)) {
+
+    return Vec3f(0, 0, 0);
+  }
 
   // Not occluded, compute the contribution using perfect diffuse diffuse model
   // Perform a quick and dirty check to determine whether the BSDF is ideal
@@ -168,12 +195,109 @@ Vec3f IntersectionTestIntegrator::directLighting(
     Float cos_theta =
         std::max(Dot(light_dir, interaction.normal), 0.0f);  // one-sided
 
-    // You should assign the value to color
-    // color = ...
-    UNIMPLEMENTED;
+    
+    //HW3 IMPLEMENTED
+
+    interaction.wi = light_dir;
+
+    Vec3f albedo = bsdf->evaluate(interaction);
+    
+
+    Float attenuation = 0.5f / (dist_to_light * dist_to_light);
+    
+    color = albedo * cos_theta * point_light_flux * attenuation;
   }
 
   return color;
+}
+
+//HW3 IMPLEMENTED
+
+Vec3f IntersectionTestIntegrator::directLightingAreaLight(
+    ref<Scene> scene, SurfaceInteraction &interaction) const {
+  Vec3f total_color(0, 0, 0);
+  
+
+  const BSDF *bsdf = interaction.bsdf;
+  bool is_ideal_diffuse = dynamic_cast<const IdealDiffusion *>(bsdf) != nullptr;
+  
+  if (bsdf == nullptr || !is_ideal_diffuse) {
+    return total_color;
+  }
+  
+
+  Vec3f light_normal(0, -1, 0);  // Light facing down
+  Vec3f light_tangent(1, 0, 0);  // X direction
+  Vec3f light_bitangent(0, 0, 1); // Z direction
+  
+  int visible_samples = 0;
+  
+
+  int samples_per_dim = (int)std::sqrt((float)area_light_samples);
+  int actual_samples = samples_per_dim * samples_per_dim;
+  
+  for (int i = 0; i < actual_samples; i++) {
+
+    int grid_x = i % samples_per_dim;
+    int grid_y = i / samples_per_dim;
+    
+
+    Float jitter_x = (Float)((i * 73) % 100) / 100.0f;
+    Float jitter_y = (Float)((i * 137) % 100) / 100.0f;
+    
+
+    Float u = (grid_x + jitter_x) / samples_per_dim;
+    Float v = (grid_y + jitter_y) / samples_per_dim;
+    
+
+    u = u - 0.5f;
+    v = v - 0.5f;
+    
+
+    Vec3f light_sample_pos = point_light_position
+        + u * area_light_size.x * light_tangent
+        + v * area_light_size.y * light_bitangent;
+    
+
+    Vec3f to_light = light_sample_pos - interaction.p;
+    Float dist_to_sample = Norm(to_light);
+    Vec3f light_dir = to_light / dist_to_sample;  // Normalize
+    
+
+    SurfaceInteraction shadow_interaction;
+    auto shadow_ray = DifferentialRay(interaction.p, light_dir);
+    shadow_ray.setTimeMax(dist_to_sample - EPS);
+    
+    if (!scene->intersect(shadow_ray, shadow_interaction)) {
+
+      visible_samples++;
+      
+
+      Float cos_theta = std::max(Dot(light_dir, interaction.normal), 0.0f);
+      
+
+      Float cos_theta_light = std::max(Dot(-light_dir, light_normal), 0.0f);
+      
+
+      interaction.wi = light_dir;
+      Vec3f albedo = bsdf->evaluate(interaction);
+      
+
+      Float attenuation = 0.5f / (dist_to_sample * dist_to_sample);
+      
+
+      Float geometric_term = cos_theta * cos_theta_light;
+      
+      total_color += albedo * geometric_term * point_light_flux * attenuation;
+    }
+  }
+  
+
+  if (actual_samples > 0) {
+    total_color = total_color / Float(actual_samples);
+  }
+  
+  return total_color;
 }
 
 /* ===================================================================== *

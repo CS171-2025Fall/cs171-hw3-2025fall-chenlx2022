@@ -38,6 +38,13 @@ public:
     point_light_flux =
         props.getProperty<Vec3f>("point_light_flux", Vec3f(1.0F, 1.0F, 1.0F));
 
+
+    //HW3 IMPLEMENTED
+
+    use_area_light = props.getProperty<bool>("use_area_light", false);
+    area_light_size = props.getProperty<Vec2f>("area_light_size", Vec2f(0.5F, 0.5F));
+    area_light_samples = props.getProperty<int>("area_light_samples", 16);
+
     max_depth = props.getProperty<int>("max_depth", 16);
     spp       = props.getProperty<int>("spp", 8);
   }
@@ -60,6 +67,10 @@ public:
 
   /// @brief Compute direct lighting at the interaction point
   Vec3f directLighting(ref<Scene> scene, SurfaceInteraction &interaction) const;
+  
+  //HW3 IMPLEMENTED
+
+  Vec3f directLightingAreaLight(ref<Scene> scene, SurfaceInteraction &interaction) const;
 
 protected:
   /// The position of the point light
@@ -67,6 +78,13 @@ protected:
 
   /// The radiance of the point light
   Vec3f point_light_flux;
+
+
+  //HW3 IMPLEMENTED
+
+  bool use_area_light;
+  Vec2f area_light_size;  
+  int area_light_samples;  
 
   int max_depth, spp;
 };
